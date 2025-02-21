@@ -1,7 +1,7 @@
 import sys
 
 from amr_utils.alignments import AMR_Alignment
-
+import re
 
 class AMR:
 
@@ -109,6 +109,8 @@ def metadata_string(amr):
 
     return output
 
+def alphanum_key(s):
+    return [int(text) if text.isdigit() else text for text in re.split('(\d+)', s)]
 
 def graph_string(amr):
     amr_string = f'[[{amr.root}]]'
@@ -135,7 +137,10 @@ def graph_string(amr):
         for n in nodes.copy():
             id = new_ids[n] if n in new_ids else 'x91'
             concept = amr.nodes[n] if n in new_ids and amr.nodes[n] else 'None'
-            edges = sorted([e for e in amr.edges if e[0] == n], key=lambda x: x[1])
+            edges = sorted(
+                [e for e in amr.edges if e[0] == n],
+                key=lambda x: (x[1] != ":name", alphanum_key(x[1]))
+            )
             targets = set(t for s, r, t in edges)
             edges = [f'{r} [[{t}]]' for s, r, t in edges]
             children = f'\n{tab}'.join(edges)
