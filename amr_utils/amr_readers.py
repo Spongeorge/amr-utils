@@ -213,60 +213,63 @@ class AMR_Reader:
     def __init__(self, style='isi'):
         self.style=style
 
-    def load(self, amr_file_name, remove_wiki=False, output_alignments=False):
+    def load(self, amr_file, remove_wiki=False, output_alignments=False, amr_file_is_path=True):
         print('[amr]', 'Loading AMRs from file:', amr_file_name)
         amrs = []
         alignments = {}
         penman_wrapper = PENMAN_Wrapper(style=self.style)
         metadata_parser = Matedata_Parser()
 
-        with open(amr_file_name, 'r', encoding='utf8') as f:
-            sents = f.read().replace('\r', '').split('\n\n')
-            amr_idx = 0
-            no_tokens = False
-            if all(sent.strip().startswith('(') for sent in sents):
-                no_tokens = True
+        if amr_file_is_path:
+            with open(amr_file, 'r', encoding='utf8') as f:
+                sents = f.read().replace('\r', '').split('\n\n')
+        else:
+            sents = amr_file.replace('\r', '').split('\n\n')
+        amr_idx = 0
+        no_tokens = False
+        if all(sent.strip().startswith('(') for sent in sents):
+            no_tokens = True
 
-            for sent in sents:
-                prefix_lines = [line for i,line in enumerate(sent.split('\n')) if line.strip().startswith('#') or (i==0 and not no_tokens)]
-                prefix = '\n'.join(prefix_lines)
-                amr_string_lines = [line for i, line in enumerate(sent.split('\n'))
-                                    if not line.strip().startswith('#') and (i>0 or no_tokens)]
-                amr_string = ''.join(amr_string_lines).strip()
-                amr_string = re.sub(' +', ' ', amr_string)
-                if not amr_string: continue
-                if not amr_string.startswith('(') or not amr_string.endswith(')'):
-                    raise Exception('Could not parse AMR from: ', amr_string)
-                metadata, graph_metadata = metadata_parser.readlines(prefix)
-                tokens = metadata['tok'] if 'tok' in metadata else metadata['snt'].split()
-                tokens = self._clean_tokens(tokens)
-                if graph_metadata:
-                    amr, aligns = self._parse_amr_from_metadata(tokens, graph_metadata)
+        for sent in sents:
+            prefix_lines = [line for i,line in enumerate(sent.split('\n')) if line.strip().startswith('#') or (i==0 and not no_tokens)]
+            prefix = '\n'.join(prefix_lines)
+            amr_string_lines = [line for i, line in enumerate(sent.split('\n'))
+                                if not line.strip().startswith('#') and (i>0 or no_tokens)]
+            amr_string = ''.join(amr_string_lines).strip()
+            amr_string = re.sub(' +', ' ', amr_string)
+            if not amr_string: continue
+            if not amr_string.startswith('(') or not amr_string.endswith(')'):
+                raise Exception('Could not parse AMR from: ', amr_string)
+            metadata, graph_metadata = metadata_parser.readlines(prefix)
+            tokens = metadata['tok'] if 'tok' in metadata else metadata['snt'].split()
+            tokens = self._clean_tokens(tokens)
+            if graph_metadata:
+                amr, aligns = self._parse_amr_from_metadata(tokens, graph_metadata)
+                amr.id = metadata['id']
+                if output_alignments:
+                    alignments[amr.id] = aligns
+            else:
+                amr, other_stuff = penman_wrapper.parse_amr(tokens, amr_string)
+                if 'id' in metadata:
                     amr.id = metadata['id']
-                    if output_alignments:
-                        alignments[amr.id] = aligns
                 else:
-                    amr, other_stuff = penman_wrapper.parse_amr(tokens, amr_string)
-                    if 'id' in metadata:
-                        amr.id = metadata['id']
-                    else:
-                        amr.id = str(amr_idx)
-                    if output_alignments:
-                        alignments[amr.id] = []
-                        if 'alignments' in metadata:
-                            aligns = metadata['alignments'].split()
-                            if any('|' in a for a in aligns):
-                                jamr_labels = other_stuff[1]
-                                alignments[amr.id] = self._parse_jamr_alignments(amr, amr_file_name, aligns, jamr_labels, metadata_parser)
-                            else:
-                                isi_labels, isi_edge_labels = other_stuff[2:4]
-                                alignments[amr.id] = self._parse_isi_alignments(amr, amr_file_name, aligns, isi_labels, isi_edge_labels)
+                    amr.id = str(amr_idx)
+                if output_alignments:
+                    alignments[amr.id] = []
+                    if 'alignments' in metadata:
+                        aligns = metadata['alignments'].split()
+                        if any('|' in a for a in aligns):
+                            jamr_labels = other_stuff[1]
+                            alignments[amr.id] = self._parse_jamr_alignments(amr, amr_file_name, aligns, jamr_labels, metadata_parser)
                         else:
-                            aligns = other_stuff[4]
-                            alignments[amr.id] = aligns
-                amr.metadata = {k:v for k,v in metadata.items() if k not in ['tok','id']}
-                amrs.append(amr)
-                amr_idx += 1
+                            isi_labels, isi_edge_labels = other_stuff[2:4]
+                            alignments[amr.id] = self._parse_isi_alignments(amr, amr_file_name, aligns, isi_labels, isi_edge_labels)
+                    else:
+                        aligns = other_stuff[4]
+                        alignments[amr.id] = aligns
+            amr.metadata = {k:v for k,v in metadata.items() if k not in ['tok','id']}
+            amrs.append(amr)
+            amr_idx += 1
         if remove_wiki:
             for amr in amrs:
                 wiki_nodes = []
