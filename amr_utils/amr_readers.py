@@ -214,7 +214,6 @@ class AMR_Reader:
         self.style=style
 
     def load(self, amr_file, remove_wiki=False, output_alignments=False, amr_file_is_path=True):
-        print('[amr]', 'Loading AMRs from file:', amr_file_name)
         amrs = []
         alignments = {}
         penman_wrapper = PENMAN_Wrapper(style=self.style)
@@ -260,10 +259,10 @@ class AMR_Reader:
                         aligns = metadata['alignments'].split()
                         if any('|' in a for a in aligns):
                             jamr_labels = other_stuff[1]
-                            alignments[amr.id] = self._parse_jamr_alignments(amr, amr_file_name, aligns, jamr_labels, metadata_parser)
+                            alignments[amr.id] = self._parse_jamr_alignments(amr, amr_file, aligns, jamr_labels, metadata_parser)
                         else:
                             isi_labels, isi_edge_labels = other_stuff[2:4]
-                            alignments[amr.id] = self._parse_isi_alignments(amr, amr_file_name, aligns, isi_labels, isi_edge_labels)
+                            alignments[amr.id] = self._parse_isi_alignments(amr, amr_file, aligns, isi_labels, isi_edge_labels)
                     else:
                         aligns = other_stuff[4]
                         alignments[amr.id] = aligns
